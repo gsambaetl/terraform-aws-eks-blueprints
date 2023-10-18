@@ -301,58 +301,58 @@ resource "aws_acmpca_certificate_authority_certificate" "this" {
 }
 
 #  This resource creates a CRD of AWSPCAClusterIssuer Kind, which then represents the ACM PCA in K8
-resource "kubectl_manifest" "cluster_pca_issuer" {
-  yaml_body = yamlencode({
-    apiVersion = "awspca.cert-manager.io/v1beta1"
-    kind       = "AWSPCAClusterIssuer"
+resource "kubernetes_manifest" "cluster_pca_issuer" {
+  manifest = {
+    "apiVersion" = "awspca.cert-manager.io/v1beta1"
+    "kind"       = "AWSPCAClusterIssuer"
 
-    metadata = {
-      name = module.eks.cluster_name
+    "metadata" = {
+      "name" = module.eks.cluster_name
     }
 
-    spec = {
-      arn = aws_acmpca_certificate_authority.this.arn
-      region : local.region
+    "spec" = {
+      "arn"    = aws_acmpca_certificate_authority.this.arn
+      "region" = local.region
     }
-  })
+  }
 }
 
 # This resource creates a CRD of Certificate Kind, which then represents certificate issued from ACM PCA,
 # mounted as K8 secret
-resource "kubectl_manifest" "pca_certificate" {
-  yaml_body = yamlencode({
-    apiVersion = "cert-manager.io/v1"
-    kind       = "Certificate"
+resource "kubernetes_manifest" "pca_certificate" {
+  manifest = {
+    "apiVersion" = "cert-manager.io/v1"
+    "kind"       = "Certificate"
 
-    metadata = {
-      name      = var.certificate_name
-      namespace = "default"
+    "metadata" = {
+      "name"      = var.certificate_name
+      "namespace" = "default"
     }
 
-    spec = {
-      commonName = var.certificate_dns
-      duration   = "2160h0m0s"
-      issuerRef = {
-        group = "awspca.cert-manager.io"
-        kind  = "AWSPCAClusterIssuer"
-        name : module.eks.cluster_name
+    "spec" = {
+      "commonName" = var.certificate_dns
+      "duration"   = "2160h0m0s"
+      "issuerRef" = {
+        "group" = "awspca.cert-manager.io"
+        "kind"  = "AWSPCAClusterIssuer"
+        "name"  = module.eks.cluster_name
       }
-      renewBefore = "360h0m0s"
+      "renewBefore" = "360h0m0s"
       # This is the name with which the K8 Secret will be available
-      secretName = "${var.certificate_name}-clusterissuer"
-      usages = [
+      "secretName" = "${var.certificate_name}-clusterissuer"
+      "usages" = [
         "server auth",
         "client auth"
       ]
-      privateKey = {
-        algorithm : "RSA"
-        size : 2048
+      "privateKey" = {
+        "algorithm" = "RSA"
+        "size"      = "2048"
       }
     }
-  })
+  }
 
   depends_on = [
-    kubectl_manifest.cluster_pca_issuer,
+    kubernetes_manifest.cluster_pca_issuer,
   ]
 }
 

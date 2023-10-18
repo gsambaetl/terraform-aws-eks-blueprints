@@ -4,7 +4,17 @@ This pattern demonstrates how to deploy and configure AppMesh mTLS on an Amazon 
 
 ## Deploy
 
-See [here](https://aws-ia.github.io/terraform-aws-eks-blueprints/getting-started/#prerequisites) for the prerequisites and steps to deploy this pattern.
+To provision this pattern, you'll need to run the following commands with [targeted Terraform apply's](https://developer.hashicorp.com/terraform/tutorials/state/resource-targeting):
+
+```
+terraform init
+terraform apply -target="module.vpc" -auto-approve
+terraform apply -target="module.eks" -auto-approve
+terraform apply -target="module.eks_blueprints_addons" -auto-approve
+terraform apply -auto-approve
+```
+
+See [here](https://aws-ia.github.io/terraform-aws-eks-blueprints/getting-started/#prerequisites) for more details about the prerequisites and steps to deploy patterns.
 
 ## Validate
 
@@ -256,6 +266,13 @@ Delete the example resources created first:
 kubectl delete all --all
 ```
 
-{%
-   include-markdown "../../docs/_partials/destroy.md"
-%}
+Run targeted Terraform destroy's to remove cleanup your environment.
+
+```
+terraform destroy -target="kubernetes_manifest.pca_certificate" -target="kubernetes_manifest.cluster_pca_issuer" -auto-approve
+terraform destroy -target="module.eks_blueprints_addons" -auto-approve
+terraform destroy -target="module.eks" -auto-approve
+terraform destroy -auto-approve
+```
+
+See [here](https://aws-ia.github.io/terraform-aws-eks-blueprints/getting-started/#destroy) for more details on cleaning up the resources created.
