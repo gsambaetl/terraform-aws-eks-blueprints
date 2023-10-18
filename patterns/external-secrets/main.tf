@@ -154,24 +154,55 @@ resource "aws_kms_key" "secrets" {
   enable_key_rotation = true
 }
 
-resource "kubectl_manifest" "cluster_secretstore" {
-  yaml_body  = <<YAML
-apiVersion: external-secrets.io/v1beta1
-kind: ClusterSecretStore
-metadata:
-  name: ${local.cluster_secretstore_name}
-spec:
-  provider:
-    aws:
-      service: SecretsManager
-      region: ${local.region}
-      auth:
-        jwt:
-          serviceAccountRef:
-            name: ${local.cluster_secretstore_sa}
-            namespace: ${local.namespace}
-YAML
+resource "kubernetes_manifest" "cluster_secretstore" {
+  manifest = {
+    "apiVersion" = "external-secrets.io/v1beta1"
+    "kind"       = "ClusterSecretStore"
+    "metadata" = {
+      "name" = local.cluster_secretstore_name
+    }
+    "spec" = {
+      "provider" = {
+        "aws" = {
+          "service" = "SecretsManager"
+          "region"  = local.region
+          "auth" = {
+            "jwt" = {
+              "serviceAccountRef" = {
+                "name"      = local.cluster_secretstore_sa
+                "namespace" = local.namespace
+              }
+            }
+          }
+        }
+      }
+    }
+  }
   depends_on = [module.eks_blueprints_addons]
+}
+
+resource "kubernetes_manifest" "secret" {
+  manifest = {
+    "apiVersion" = "external-secrets.io/v1beta1"
+    "kind"       = "ExternalSecret"
+    "metadata" = {
+      "name"      = "${local.name}-sm"
+      "namespace" = local.namespace
+    }
+    "spec" = {
+      "refreshInterval" = "1h"
+      "secretStoreRef" = {
+        "name" = local.cluster_secretstore_name
+        "kind" = "ClusterSecretStore"
+      }
+      "dataFrom" = [{
+        "extract" = {
+          "key" = aws_secretsmanager_secret.secret.name
+        }
+      }]
+    }
+  }
+  depends_on = [kubernetes_manifest.cluster_secretstore]
 }
 
 resource "aws_secretsmanager_secret" "secret" {
@@ -187,46 +218,34 @@ resource "aws_secretsmanager_secret_version" "secret" {
   })
 }
 
-resource "kubectl_manifest" "secret" {
-  yaml_body  = <<YAML
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: ${local.name}-sm
-  namespace: ${local.namespace}
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: ${local.cluster_secretstore_name}
-    kind: ClusterSecretStore
-  dataFrom:
-  - extract:
-      key: ${aws_secretsmanager_secret.secret.name}
-YAML
-  depends_on = [kubectl_manifest.cluster_secretstore]
-}
-
 #---------------------------------------------------------------
 # External Secrets Operator - Parameter Store
 #---------------------------------------------------------------
 
-resource "kubectl_manifest" "secretstore" {
-  yaml_body  = <<YAML
-apiVersion: external-secrets.io/v1beta1
-kind: SecretStore
-metadata:
-  name: ${local.secretstore_name}
-  namespace: ${local.namespace}
-spec:
-  provider:
-    aws:
-      service: ParameterStore
-      region: ${local.region}
-      auth:
-        jwt:
-          serviceAccountRef:
-            name: ${local.secretstore_sa}
-YAML
+resource "kubernetes_manifest" "secretstore" {
+  manifest = {
+    "apiVersion" = "external-secrets.io/v1beta1"
+    "kind"       = "ClusterSecretStore"
+    "metadata" = {
+      "name"      = local.secretstore_name
+      "namespace" = local.namespace
+    }
+    "spec" = {
+      "provider" = {
+        "aws" = {
+          "service" = "ParameterStore"
+          "region"  = local.region
+          "auth" = {
+            "jwt" = {
+              "serviceAccountRef" = {
+                "name" = local.cluster_secretstore_sa
+              }
+            }
+          }
+        }
+      }
+    }
+  }
   depends_on = [module.eks_blueprints_addons]
 }
 
@@ -241,23 +260,28 @@ resource "aws_ssm_parameter" "secret_parameter" {
 }
 
 
-resource "kubectl_manifest" "secret_parameter" {
-  yaml_body  = <<YAML
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: ${local.name}-ps
-  namespace: ${local.namespace}
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: ${local.secretstore_name}
-    kind: SecretStore
-  dataFrom:
-  - extract:
-      key: ${aws_ssm_parameter.secret_parameter.name}
-YAML
-  depends_on = [kubectl_manifest.secretstore]
+resource "kubernetes_manifest" "secret_parameter" {
+  manifest = {
+    "apiVersion" = "external-secrets.io/v1beta1"
+    "kind"       = "ExternalSecret"
+    "metadata" = {
+      "name"      = "${local.name}-ps"
+      "namespace" = local.namespace
+    }
+    "spec" = {
+      "refreshInterval" = "1h"
+      "secretStoreRef" = {
+        "name" = local.cluster_secretstore_name
+        "kind" = "SecretStore"
+      }
+      "dataFrom" = [{
+        "extract" = {
+          "key" = aws_ssm_parameter.secret_parameter.name
+        }
+      }]
+    }
+  }
+  depends_on = [kubernetes_manifest.secretstore]
 }
 
 #---------------------------------------------------------------

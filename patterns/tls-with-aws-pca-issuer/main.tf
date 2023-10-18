@@ -174,8 +174,8 @@ resource "aws_acmpca_certificate_authority_certificate" "this" {
 #-------------------------------
 
 # Using kubectl to workaround kubernetes provider issue https://github.com/hashicorp/terraform-provider-kubernetes/issues/1453
-resource "kubectl_manifest" "cluster_pca_issuer" {
-  yaml_body = yamlencode({
+resource "kubernetes_manifest" "cluster_pca_issuer" {
+  manifest = {
     apiVersion = "awspca.cert-manager.io/v1beta1"
     kind       = "AWSPCAClusterIssuer"
 
@@ -187,7 +187,7 @@ resource "kubectl_manifest" "cluster_pca_issuer" {
       arn = aws_acmpca_certificate_authority.this.arn
       region : local.region
     }
-  })
+  }
 
   depends_on = [
     module.eks_blueprints_addons
@@ -200,8 +200,8 @@ resource "kubectl_manifest" "cluster_pca_issuer" {
 #-------------------------------
 
 # Using kubectl to workaround kubernetes provider issue https://github.com/hashicorp/terraform-provider-kubernetes/issues/1453
-resource "kubectl_manifest" "pca_certificate" {
-  yaml_body = yamlencode({
+resource "kubernetes_manifest" "pca_certificate" {
+  manifest = {
     apiVersion = "cert-manager.io/v1"
     kind       = "Certificate"
 
@@ -229,10 +229,10 @@ resource "kubectl_manifest" "pca_certificate" {
         size : 2048
       }
     }
-  })
+  }
 
   depends_on = [
-    kubectl_manifest.cluster_pca_issuer,
+    kubernetes_manifest.cluster_pca_issuer,
   ]
 }
 
